@@ -14,11 +14,17 @@ class Transcriber(object):
 
 
     def run(self, messages, callback):
-        for start, end_of_stream, audio_buffer in self.messages_to_segments(messages):
+        for start, end_of_stream, audio_buffer \
+            in self.messages_to_segments(messages):
             self.asr.reset()
             self.asr.recognize_chunk(audio_buffer)
-            nbest, _, alignment_with_confidence = self.asr.get_final_hypothesis(compute_alignment_with_word_confidence=True)
-            callback(nbest, end_of_segment=True, end_of_stream=end_of_stream, alignment_with_confidence=alignment_with_confidence, start=start)
+            nbest, _, alignment_with_confidence \
+                = self.asr.get_final_hypothesis\
+                (compute_alignment_with_word_confidence=True)
+            callback(nbest, end_of_segment=True,
+                     end_of_stream=end_of_stream,
+                     alignment_with_confidence=alignment_with_confidence,
+                     start=start)
 
     def messages_to_segments(self, messages):
         self.vad.reset()
@@ -53,7 +59,9 @@ def video_to_pcm_chunks(url, chunk_size=16000):
 
     while True:
         pcm = process.stdout.read(chunk_size)
-
+        # There should be a timeout on this read, in case ffmpeg gets stuck
+        # (e.g., on a stale nfs file handle). Can be done via os.select(). [UG]
+        
         exit_code = process.poll()
         if exit_code is not None and exit_code != 0:
             error = re.compile(r'(error|fail)', re.I)
@@ -70,7 +78,7 @@ def rabbitmq_callback(channel, queue, routing_keys,
                       task_metadata, publish_result):
     # accumulate segments in case a message goes missing
     segments = []
-
+    
     def callback(nbest, end_of_segment=False, end_of_stream=False,
                  alignment=None, alignment_with_confidence=None, start=0.0):
         if alignment_with_confidence is not None:

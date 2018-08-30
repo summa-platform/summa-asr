@@ -9,154 +9,60 @@ from concurrent.futures import CancelledError
 from aio_pika import connect, Message, ExchangeType
 import pika.exceptions
 
-try:
-    from task import NoFinalResult
-except ImportError:
-    class NoFinalResult(Exception): pass
+import asr_task
+from asr_task import on_message
 
-try:
-    from task import ErrorMessage
-except ImportError:
-    class ErrorMessage(Exception): pass
+# async def on_message(message, reply, loop=None, name=task.name, verbose=True, **kwargs):
+#     # with message.process():   # with message auto acknowledgement
+#     routing_keys = message.headers['replyToRoutingKeys']
+#     body_dict = json.loads(message.body.decode("utf-8"))
+#     task_data = body_dict['taskData']
+#     task_metadata = body_dict['taskMetadata']
 
-try:
-    from task import RejectError
-except ImportError:
-    class RejectError(Exception): pass
+#     async def send_reply(result_data, result_type='partialResult'):
+#         await reply(
+#             Message(
+#                 bytes(json.dumps(dict(resultData=result_data, resultType=result_type, taskMetadata=task_metadata)), 'utf8'),
+#                 headers=dict(resultProducerName=name)
+#             ),
+#             routing_keys[result_type]
+#         )
 
-try:
-    from task import RejectRequeueError
-except ImportError:
-    class RejectRequeueError(Exception): pass
+#     try:
+#         item = task_metadata.get('itemId', 'unknown')
+#         if verbose:
+#             print('New job request for item %s received!' % item)
+#             # print(task_metadata)
+#             # print(task_data)
 
-try:
-    import task
-except ImportError:
+#         result_data = await task.process_message(task_data, loop=loop, send_reply=send_reply, **kwargs)
 
-    if __name__ == "__main__":
-        print('warning: module task not found, use "--dummy" argument to use dummy test task for RabbitMQ client', file=sys.stderr)
+#         if verbose:
+#             print('Job for item %s completed!' % item)
 
-        import sys
-        if '--dummy' not in sys.argv[1:]:
-            raise
-
-        class DummyTask:
-            name = 'DUMMY-TEST-TASK'
-            def setup_argparser(self, parser):
-                parser.add_argument('--test', action='store_true', help='test with %s' % self.name)
-            def init(self, args=None):
-                print('Initializing %s ...' % self.name, file=sys.stderr)
-                if args.test:
-                    print('%s test mode enabled')
-                self.args = args
-            def shutdown(self):
-                print('shutting down %s ...' % self.name, file=sys.stderr)
-            def reset(self):
-                print('restarting %s ...' % self.name, file=sys.stderr)
-            async def process_message(self, task_data, loop=None, send_reply=None, **kwargs):
-                print('%s will process input data:' % self.name, task_data)
-                if self.args:
-                    print('Test mode enabled')
-                for i in range(5):
-                    print('Waiting %i seconds for first partial result to be sent' % i)
-                    await asyncio.sleep(i)
-                    if send_reply:
-                        await send_reply('%i. partial result from %s' % (i, self.name))
-                print('%s is complete!' % self.name)
-                return 'Final result of %s: SUCCESS' % self.name
-
-        task = DummyTask()
-
-
-
-async def on_message(message, reply, loop=None, name=task.name, verbose=True, **kwargs):
-    # with message.process():   # with message auto acknowledgement
-    routing_keys = message.headers['replyToRoutingKeys']
-    body_dict = json.loads(message.body.decode("utf-8"))
-    task_data = body_dict['taskData']
-    task_metadata = body_dict['taskMetadata']
-
-    async def send_reply(result_data, result_type='partialResult'):
-        await reply(
-            Message(
-                bytes(json.dumps(dict(resultData=result_data, resultType=result_type, taskMetadata=task_metadata)), 'utf8'),
-                headers=dict(resultProducerName=name)
-            ),
-            routing_keys[result_type]
-        )
-
-    try:
-        item = task_metadata.get('itemId', 'unknown')
-        if verbose:
-            print('New job request for item %s received!' % item)
-            # print(task_metadata)
-            # print(task_data)
-
-        result_data = await task.process_message(task_data, loop=loop, send_reply=send_reply, **kwargs)
-
-        if verbose:
-            print('Job for item %s completed!' % item)
-
-        await send_reply(result_data, 'finalResult')
-        message.ack()
-    except NoFinalResult:
-        print('Job for item %s completed!' % item)
-        message.ack()
-    except RejectError as e:
-        if verbose:
-            print('Job for item %s rejected:' % item, e)
-        message.reject(requeue=False)
-        return
-    except RejectRequeueError as e:
-        if verbose:
-            print('Job for item %s rejected (and requeued):' % item, e)
-        message.reject(requeue=True)
-        return
-    except CancelledError:
-        # stop, do not send reply, requeue incomming message
-        if verbose:
-            print('Job for item %s cancelled!' % item)
-        try:
-            message.reject(requeue=True)
-        except pika.exceptions.ConnectionClosed:
-            pass
-        # raise
-        return
-    except KeyboardInterrupt:
-        # stop, do not send reply, requeue incomming message
-        if verbose:
-            print('Job for item %s cancelled!' % item)
-        message.reject(requeue=True)
-        # raise
-        return
-    except ErrorMessage as e:
-        if verbose:
-            print('Job for item %s failed with error:' % item, e)
-        else:
-            log(e)
-        await send_reply(str(e), 'processingError')
-        message.ack()
-    except Exception as e:
-        # traceback.print_exc()
-        exception = ''.join(traceback.format_exception(*sys.exc_info()))
-        if verbose:
-            print('Job for item %s failed with error: %s\n%s' % (item, str(e), exception))
-        await send_reply(exception, 'processingError')
-        # await send_reply(str(e), 'processingError')
-        message.ack()
-
-    # await reply(
-    #     Message(
-    #         bytes(json.dumps(dict(resultData=result_data, resultType=result_type, taskMetadata=task_metadata)), 'utf8'),
-    #         headers=dict(resultProducerName=name)
-    #     ),
-    #     routing_keys[result_type]
-    # )
-
+#         await send_reply(result_data, 'finalResult')
+#         message.ack()
+        
+#     except KeyboardInterrupt: # move this to response collector [UG]
+#         # stop, do not send reply, requeue incomming message
+#         if verbose:
+#             print('Job for item %s cancelled!' % item)
+#         message.reject(requeue=True)
+#         # raise
+#         return
+#     except Exception as e:
+#         # traceback.print_exc()
+#         exception = ''.join(traceback.format_exception(*sys.exc_info()))
+#         if verbose:
+#             print('Job for item %s failed with error: %s\n%s' % (item, str(e), exception))
+#         await send_reply(exception, 'processingError')
+#         # await send_reply(str(e), 'processingError')
+#         message.ack()
 
 def log(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
+ 
 
 async def run(url, input_queue, output_exchange, loop=None, num_parallel=1, reconnect_delay=5,
         on_message=None, handle_all_exceptions=True, kwargs={}):
@@ -221,8 +127,10 @@ async def run(url, input_queue, output_exchange, loop=None, num_parallel=1, reco
         return on_message
 
     def message_callback(message):
-        t = asyncio.ensure_future((on_message or get_on_message())(message, exchange_out.publish, loop=loop, **kwargs))
-        t.must_await = True   # hack to identify on_message tasks
+        # replace by await on_message, which should schedule tail end
+        await (on_message or get_on_message())(message, exchange_out.publish, loop=loop, **kwargs)
+        # t = asyncio.ensure_future((on_message or get_on_message())(message, exchange_out.publish, loop=loop, **kwargs))
+        # t.must_await = True   # hack to identify on_message tasks
 
     async def _connect():
         nonlocal connection, queue_in, exchange_out
@@ -271,13 +179,23 @@ def wait_for_incomplete_message_callbacks(loop):
     # loop.run_until_complete(loop.shutdown_asyncgens())    # Python 3.6
 
 
-def run_forever(url=None, queue_in=None, exchange_out=None, num_parallel=1, reconnect_delay=5, debug=False,
-        on_message=None, handle_all_exceptions=True, **kwargs):
+def run_forever(args,**kwargs):
+    url = args.RABBITMQ_URL
+    queue_in = args.QUEUE_IN
+    exchange_out = args.EXCHANGE_OUT
+    num_workers=args.PARALLEL
+    reconnect_delay=args.reconnect_delay
+    debug=args.debug
+    verbose=args.verbose
+    on_message = asr_task.on_message
+    handle_all_exceptions=True
     try:
         loop = asyncio.get_event_loop()
-        loop.set_debug(False)
-        loop.create_task(run(url, queue_in, exchange_out, loop=loop, num_parallel=num_parallel, reconnect_delay=reconnect_delay,
-            on_message=on_message, handle_all_exceptions=handle_all_exceptions, kwargs=kwargs))
+        loop.set_debug(debug)
+        loop.create_task(run(url, queue_in, exchange_out, loop=loop,
+                             num_parallel=num_parallel, reconnect_delay=reconnect_delay,
+                             on_message=on_message, handle_all_exceptions=handle_all_exceptions,
+                             kwargs=kwargs))
         loop.run_forever()
     except KeyboardInterrupt:
         log('MAIN INTERRUPTED')
@@ -305,10 +223,11 @@ def main(task=task):
     import argparse
 
     parser = argparse.ArgumentParser(description='RabbitMQ Worker', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--parallel', '-n', dest='PARALLEL', type=int, default=os.environ.get('PARALLEL',1),
-            help='messages to process in parallel (or set env variable PARALLEL)')
+    parser.add_argument('--parallel', '-n', dest='PARALLEL', type=int,
+                        default=os.environ.get('PARALLEL',1),  
+                        help='messages to process in parallel (or set env variable PARALLEL)')
     parser.add_argument('--reconnect-delay', type=int, default=os.environ.get('RECONNECT_DELAY', 5),
-            help='number of seconds to wait before reconnect attempt (or set env variable RECONNECT_DELAY)')
+                        help='number of seconds to wait before reconnect attempt (or set env variable RECONNECT_DELAY)')
     parser.add_argument('--startup-delay', type=int, default=os.environ.get('STARTUP_DELAY', 0),
             help='number of seconds to wait before starting RabbitMQ client (or set env variable STARTUP_DELAY)')
     parser.add_argument('--debug', action='store_true', help='debug mode for asyncio')
@@ -353,8 +272,7 @@ def main(task=task):
 
     log("Starting RabbitMQ client ...")
 
-    run_forever(args.RABBITMQ_URL, args.QUEUE_IN, args.EXCHANGE_OUT, num_parallel=args.PARALLEL, reconnect_delay=args.reconnect_delay,
-            debug=args.debug, verbose=args.verbose)
+    run_forever(args)
 
 
 if __name__ == "__main__":
