@@ -27,10 +27,8 @@ RUN apt-get update && apt-get install -y \
 # included in the .deb file that is created there.
 
 COPY --from=builder /opt/alex-asr/*.deb .
-RUN dpkg -i *.deb && rm *.deb
+RUN dpkg -i *.deb && rm *.deb && rm -rf /var/lib/apt/lists/*
 ADD . /opt/app
 WORKDIR /opt/app
 
-# cleanup
-# disabled for the time being, for debugging purposes
-# RUN rm -rf /var/lib/apt/lists/*
+CMD ["/usr/bin/env", "python3", "-u", "/opt/app/rabbitmq.py"]
