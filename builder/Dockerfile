@@ -13,6 +13,7 @@ RUN apt-get update -qq && apt-get install -y \
 
 # ARG ALEX_ASR_VERSION=8da15a7
 ARG ALEX_ASR_VERSION=7ab2b0f89de468645e1d00f282aefd48ca9a314d
+ARG BUILD_ARCH=x86-64
 
 WORKDIR /opt/
 RUN git clone https://github.com/choko/alex-asr.git \
@@ -27,15 +28,16 @@ RUN git checkout ${ALEX_ASR_VERSION} \
     && git checkout $(awk -F'=' '/KALDI_REV=/ { print $2 }' < ../../prepare_env.sh)
 
 WORKDIR /opt/alex-asr/libs/kaldi/tools
-RUN sed -e "s/--enable-ngram-fsts/--enable-ngram-fsts --with-pic/g;s/openfst.cs.nyu.edu/openfst.org/g" -i Makefile && make -j openfst
-RUN sed -i "s/USE_THREAD=0/USE_THREAD=0 TARGET=x86-64/g" Makefile && make -j openblas
+RUN sed -e "s/--enable-ngram-fsts/--enable-ngram-fsts --with-pic/g;s/openfst.cs.nyu.edu/openfst.org/g" -i Makefile \
+    && make -j openfst
+RUN sed -i "s/USE_THREAD=0/USE_THREAD=0 TARGET=${BUILD_ARCH}/g" Makefile && make -j openblas
 RUN make -j openblas
 
 WORKDIR /opt/alex-asr/libs/kaldi/src
-RUN ./configure --shared --use-cuda=no --openblas-root=../tools/OpenBLAS/install && make -j 
+RUN ./configure --shared --use-cuda=no --openblas-root=../tools/OpenBLAS/install && make  
 
 WORKDIR /opt/alex-asr
-RUN make -j
+RUN make 
 
 ARG VERSION
 RUN VERSION=${VERSION:=$(date +%Y%m%d-%H%M%S)} \
