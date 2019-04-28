@@ -6,13 +6,14 @@ FROM ubuntu:16.04
 # - do things still work with TARGET=NEHALEM ???
 
 RUN apt-get update -qq && apt-get install -y \
-    git bzip2 wget \
-    g++ make python python3 python3-pip \
-    zlib1g-dev automake autoconf libtool subversion \
-    libatlas-base-dev && pip3 install --upgrade pip
+    autoconf automake bzip2 g++ git libatlas-base-dev libtool \
+    make python python3 python3-pip sox subversion wget \
+    zlib1g-dev \
+    && pip3 install --upgrade pip
 
-# ARG ALEX_ASR_VERSION=8da15a7
 ARG ALEX_ASR_VERSION=7ab2b0f89de468645e1d00f282aefd48ca9a314d
+ARG KALDI_VERSION=40a9dc642d6c1479fde5997cc7e0d5e3577f510e
+ARG OPENFST_VERSION=1.6.2
 ARG BUILD_ARCH=x86-64
 
 WORKDIR /opt/
@@ -25,13 +26,15 @@ WORKDIR /opt/alex-asr
 RUN git checkout ${ALEX_ASR_VERSION} \
     && pip3 install -r requirements.txt \
     && cd libs/kaldi \
-    && git checkout $(awk -F'=' '/KALDI_REV=/ { print $2 }' < ../../prepare_env.sh)
+    && git checkout ${KALDI_VERSION}
 
 WORKDIR /opt/alex-asr/libs/kaldi/tools
 RUN sed -e "s/--enable-ngram-fsts/--enable-ngram-fsts --with-pic/g;s/openfst.cs.nyu.edu/openfst.org/g" -i Makefile \
-    && make -j openfst
-RUN sed -i "s/USE_THREAD=0/USE_THREAD=0 TARGET=${BUILD_ARCH}/g" Makefile && make -j openblas
-RUN make -j openblas
+    && OPENFST_VERSION=${OPENFST_VERSION} make -j openfst
+RUN sed -i "s/USE_THREAD=0/USE_THREAD=0 TARGET=NEHALEM/g" Makefile && make -j openblas
+# There is no generic x86-64 target in OpenBLAS, see this issue: https://github.com/xianyi/OpenBLAS/issues/685
+# See the list of valid OpenBLAS targets here: https://github.com/xianyi/OpenBLAS/blob/develop/TargetList.txt
+# NEHALEM target should be fine for most today's x86-64 CPUs.
 
 WORKDIR /opt/alex-asr/libs/kaldi/src
 RUN ./configure --shared --use-cuda=no --openblas-root=../tools/OpenBLAS/install && make  
