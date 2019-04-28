@@ -94,8 +94,8 @@ def generate_segments(url,rqid,log=None):
                 audio_buffer = b""
             elif change == "END":
                 j = Job(seqno, rqid, start, tstamp, False, audio_buffer + chunk)
-                # if log: log("NEW SEGMENT # {:d}.{:d}: {:.1f}-{:.1f} ({:.1f} sec.)"\
-                #             .format(j.gid, seqno, start, tstamp, tstamp-start))
+                if log: log("NEW SEGMENT # {:d}.{:d}: {:.1f}-{:.1f} ({:.1f} sec.)"\
+                            .format(j.gid, seqno, start, tstamp, tstamp-start))
                 t1 = time.time()
                 job_queue.put(j)
                 t2 = time.time() - t1
@@ -112,7 +112,7 @@ def generate_segments(url,rqid,log=None):
         pass
     j = Job(seqno, rqid, start, stop, True, audio_buffer)
     job_queue.put(j)
-    # if log: log("DONE SEGMENTING")
+    if log: log("DONE SEGMENTING")
     return
 
 class CancelResponse:
@@ -188,7 +188,7 @@ def transcription_worker(model,job_queue,timeout_factor,log):
         r = p.apply_async(transcribe_segment,args=(j,asr))
         try:
             r.get(args.timeout_factor * j.runtime())
-        except TimeoutError:
+        except multiprocessing.context.TimeoutError:
             print("WARNING: TIMEOUT FOR JOB #%d"%j.seqno,file=sys.stderr)
             p.terminate()
             p.join()
@@ -221,7 +221,7 @@ def responder(rqid,immediate_callback=None,final_callback=None):
             immediate_callback(j)
             final_callback(j)
             break
-        # print("GOT RESPONSE (%d/%d)"%(j.seqno,seqno),file=sys.stderr)
+        print("GOT RESPONSE (%d/%d)"%(j.seqno,seqno),j.runtime(),j.asrtime(),file=sys.stderr)
         
         if j.seqno == seqno:
             ready.append(j)
