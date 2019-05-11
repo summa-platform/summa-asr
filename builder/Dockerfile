@@ -13,7 +13,8 @@ RUN apt-get update -qq && apt-get install -y \
 
 # ARG ALEX_ASR_VERSION=8da15a7
 ARG ALEX_ASR_VERSION=7ab2b0f89de468645e1d00f282aefd48ca9a314d
-ARG BUILD_ARCH=x86-64
+# ARG BUILD_ARCH=x86-64
+ARG BUILD_ARCH=NEHALEM
 
 WORKDIR /opt/
 RUN git clone https://github.com/choko/alex-asr.git \
