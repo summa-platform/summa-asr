@@ -1,15 +1,13 @@
-FROM summaplatform/asr-engine
-ARG MODEL_URL
-ENV MODEL_URL=$MODEL_URL
-
+ARG MODEL_IMAGE
+ARG ENGINE_VERSION
+FROM $MODEL_IMAGE as model
+FROM summaplatform/asr-engine:${ENGINE_VERSION}
+COPY --from=model /model /model
 # support for unicode in docker
 # https://github.com/docker-library/python/issues/13#issue-43852823
 ENV LANG C.UTF-8
 # for unbuffered stdout
 ENV PYTHONUNBUFFERED y
-
-WORKDIR /
-RUN [ "$MODEL_URL" != "" ] && bash /opt/app/download_models.sh ${MODEL_URL} model && rm model/model.zip
 
 WORKDIR /opt/app/
 # alternative approach to unbuffered stdout, not necessary if PYTHONUNBUFFERED is defined
