@@ -9,7 +9,7 @@ RUN apt-get update -qq && apt-get install -y \
     git bzip2 wget \
     g++ make python python3 python3-pip \
     zlib1g-dev automake autoconf libtool subversion \
-    libatlas-base-dev && pip3 install --upgrade pip
+    libatlas-base-dev sox && pip3 install --upgrade pip
 
 # ARG ALEX_ASR_VERSION=8da15a7
 ARG ALEX_ASR_VERSION=7ab2b0f89de468645e1d00f282aefd48ca9a314d
