@@ -13,6 +13,8 @@ RUN apt-get update -qq && apt-get install -y \
 
 # ARG ALEX_ASR_VERSION=8da15a7
 ARG ALEX_ASR_VERSION=7ab2b0f89de468645e1d00f282aefd48ca9a314d
+ARG KALDI_VERSION=40a9dc642d6c1479fde5997cc7e0d5e3577f510e
+ARG OPENFST_VERSION=1.6.2
 # ARG BUILD_ARCH=x86-64
 ARG BUILD_ARCH=NEHALEM
 
@@ -26,11 +28,11 @@ WORKDIR /opt/alex-asr
 RUN git checkout ${ALEX_ASR_VERSION} \
     && pip3 install -r requirements.txt \
     && cd libs/kaldi \
-    && git checkout $(awk -F'=' '/KALDI_REV=/ { print $2 }' < ../../prepare_env.sh)
+    && git checkout ${KALDI_VERSION}
 
 WORKDIR /opt/alex-asr/libs/kaldi/tools
 RUN sed -e "s/--enable-ngram-fsts/--enable-ngram-fsts --with-pic/g;s/openfst.cs.nyu.edu/openfst.org/g" -i Makefile \
-    && make -j openfst
+    && OPENFST_VERSION=${OPENFST_VERSION} make -j openfst
 RUN sed -i "s/USE_THREAD=0/USE_THREAD=0 TARGET=${BUILD_ARCH}/g" Makefile && make -j openblas
 RUN make -j openblas
 
